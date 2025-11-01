@@ -569,7 +569,7 @@ class AAXConverter:
                 return
             
             try:
-                with open(voucher_file, 'r') as f:
+                with open(voucher_file, 'r', encoding='utf-8') as f:
                     voucher_data = json.load(f)
                     key = voucher_data['content_license']['license_response']['key']
                     iv = voucher_data['content_license']['license_response']['iv']
@@ -657,6 +657,8 @@ class AAXConverter:
                 chapters = self.get_chapters(aax_file, decrypt_param)
                 if chapters:
                     # Create chapters file for mp4chaps
+                    # Note: This file is intentionally kept as part of the output
+                    # for user reference, similar to the original bash script
                     chapters_file = os.path.join(output_dir, f"{output_filename}.chapters.txt")
                     with open(chapters_file, 'w', encoding='utf-8') as cf:
                         for chapter in chapters:
