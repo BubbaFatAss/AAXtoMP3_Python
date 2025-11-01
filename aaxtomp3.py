@@ -449,8 +449,14 @@ class AAXConverter:
                         os.remove(temp_file)
             except Exception as e:
                 self.logger.debug(f"Failed to add cover art with ffmpeg: {e}")
+            finally:
+                # Ensure cleanup even if an unexpected exception occurs
                 if os.path.isfile(temp_file):
-                    os.remove(temp_file)
+                    try:
+                        os.remove(temp_file)
+                    except OSError:
+                        pass  # File was already moved or removed
+
 
     def split_chapters(self, aax_file: str, output_dir: str, decrypt_param: List[str],
                       metadata: Dict[str, str], chapters: List[Dict[str, str]],

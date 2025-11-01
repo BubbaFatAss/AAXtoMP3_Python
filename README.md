@@ -264,6 +264,8 @@ genre/
         └── title.mp3
 ```
 
+For M4B files, an additional `.chapters.txt` file is created in the output directory. This file contains chapter markers and is used by `mp4chaps` to embed chapters in the M4B file. The file is intentionally kept for user reference.
+
 ## Differences from Original Bash Script
 
 This Python port maintains feature parity with the original bash script while providing:
