@@ -422,7 +422,11 @@ class AAXConverter:
                     self.logger.debug(f"Failed to add cover art with mp4art: {e}")
         else:
             # Use ffmpeg for other containers
-            temp_file = audio_file + '.tmp'
+            # Create a unique temporary file name
+            import tempfile
+            fd, temp_file = tempfile.mkstemp(suffix=f'.{self.extension}', dir=os.path.dirname(audio_file))
+            os.close(fd)  # Close the file descriptor as we'll let ffmpeg create the file
+            
             try:
                 cmd = [
                     self.ffmpeg, '-loglevel', 'error', '-nostats',
@@ -437,6 +441,10 @@ class AAXConverter:
                 result = subprocess.run(cmd, capture_output=True)
                 if result.returncode == 0:
                     shutil.move(temp_file, audio_file)
+                else:
+                    # Clean up temp file on failure
+                    if os.path.isfile(temp_file):
+                        os.remove(temp_file)
             except Exception as e:
                 self.logger.debug(f"Failed to add cover art with ffmpeg: {e}")
                 if os.path.isfile(temp_file):
@@ -626,18 +634,9 @@ class AAXConverter:
             chapters = self.get_chapters(aax_file, decrypt_param)
             
             if chapters:
-                # First transcode the whole file (needed for chapter splitting)
-                temp_file = os.path.join(output_dir, f"temp.{self.extension}")
-                if self.transcode_file(aax_file, temp_file, decrypt_param, metadata):
-                    # Split into chapters
-                    self.split_chapters(aax_file, output_dir, decrypt_param, 
-                                      metadata, chapters, cover_file)
-                    # Remove temp file
-                    if os.path.isfile(temp_file):
-                        os.remove(temp_file)
-                else:
-                    self.logger.error("ERROR: Failed to transcode file")
-                    return
+                # Split into chapters directly from source
+                self.split_chapters(aax_file, output_dir, decrypt_param, 
+                                  metadata, chapters, cover_file)
             else:
                 self.logger.warning("No chapters found, creating single file")
                 self.mode = 'single'
