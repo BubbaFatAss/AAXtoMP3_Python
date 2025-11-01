@@ -421,15 +421,16 @@ class AAXConverter:
         else:
             # Use ffmpeg for other containers
             # Create a secure temporary file using NamedTemporaryFile
-            temp_fd = tempfile.NamedTemporaryFile(
-                suffix=f'.{self.extension}', 
-                dir=os.path.dirname(audio_file),
-                delete=False
-            )
-            temp_file = temp_fd.name
-            temp_fd.close()  # Close so ffmpeg can write to it
-            
+            temp_file = None
             try:
+                temp_fd = tempfile.NamedTemporaryFile(
+                    suffix=f'.{self.extension}', 
+                    dir=os.path.dirname(audio_file),
+                    delete=False
+                )
+                temp_file = temp_fd.name
+                temp_fd.close()  # Close so ffmpeg can write to it
+                
                 cmd = [
                     self.ffmpeg, '-loglevel', 'error', '-nostats',
                     '-i', audio_file, '-i', cover_file,
@@ -443,19 +444,16 @@ class AAXConverter:
                 result = subprocess.run(cmd, capture_output=True)
                 if result.returncode == 0:
                     shutil.move(temp_file, audio_file)
-                else:
-                    # Clean up temp file on failure
-                    if os.path.isfile(temp_file):
-                        os.remove(temp_file)
+                    temp_file = None  # File was moved successfully
             except Exception as e:
                 self.logger.debug(f"Failed to add cover art with ffmpeg: {e}")
             finally:
                 # Ensure cleanup even if an unexpected exception occurs
-                if os.path.isfile(temp_file):
+                if temp_file and os.path.isfile(temp_file):
                     try:
                         os.remove(temp_file)
                     except OSError:
-                        pass  # File was already moved or removed
+                        pass  # Failed to remove, but we tried
 
 
     def split_chapters(self, aax_file: str, output_dir: str, decrypt_param: List[str],
