@@ -422,10 +422,8 @@ class AAXConverter:
                     self.logger.debug(f"Failed to add cover art with mp4art: {e}")
         else:
             # Use ffmpeg for other containers
-            # Create a unique temporary file name
-            import tempfile
-            fd, temp_file = tempfile.mkstemp(suffix=f'.{self.extension}', dir=os.path.dirname(audio_file))
-            os.close(fd)  # Close the file descriptor as we'll let ffmpeg create the file
+            # Create a unique temporary file name (ffmpeg will create the actual file)
+            temp_file = tempfile.mktemp(suffix=f'.{self.extension}', dir=os.path.dirname(audio_file))
             
             try:
                 cmd = [
