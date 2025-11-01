@@ -1,0 +1,9 @@
+# AAXtoMP3 Python Requirements
+# This script relies on external tools rather than Python packages
+# No additional Python packages are required beyond the standard library
+
+# External dependencies (to be installed via system package manager):
+# - ffmpeg (for audio conversion)
+# - ffprobe (for metadata extraction, usually comes with ffmpeg)
+# - mp4v2-utils (optional, for mp4art and mp4chaps - M4A/M4B files only)
+# - mediainfo (optional, for additional metadata extraction)
