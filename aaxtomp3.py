@@ -52,7 +52,7 @@ class AAXConverter:
         if self.args.flac:
             self.codec = 'flac'
             self.extension = 'flac'
-            self.mode = 'single'
+            self.mode = self.args.mode
             self.container = 'flac'
         elif self.args.opus:
             self.codec = 'libopus'
@@ -62,17 +62,17 @@ class AAXConverter:
         elif self.args.aac or self.args.e_m4a:
             self.codec = 'copy'
             self.extension = 'm4a'
-            self.mode = 'single'
+            self.mode = self.args.mode
             self.container = 'mp4'
         elif self.args.e_m4b:
             self.codec = 'copy'
             self.extension = 'm4b'
-            self.mode = 'single'
+            self.mode = self.args.mode
             self.container = 'mp4'
         elif self.args.e_mp3:
             self.codec = 'libmp3lame'
             self.extension = 'mp3'
-            self.mode = 'single'
+            self.mode = self.args.mode
             self.container = 'mp3'
         else:
             # Default to mp3
@@ -175,10 +175,13 @@ class AAXConverter:
         # Get metadata from ffprobe
         try:
             cmd = [self.ffprobe] + decrypt_param + ['-i', aax_file]
-            result = subprocess.run(cmd, capture_output=True, text=True, stderr=subprocess.STDOUT)
+            result = subprocess.run(cmd, capture_output=True, text=True)
             
             # Parse ffprobe output
-            output = result.stdout
+            if result.returncode != 0:
+                self.logger.error(f"ERROR: ffprobe failed to read metadata: {result.stderr}")
+                return {}
+            output = result.stdout + result.stderr
             
             # Extract metadata fields
             patterns = {
@@ -236,7 +239,7 @@ class AAXConverter:
         
         try:
             cmd = [self.ffmpeg, '-loglevel', 'error'] + decrypt_param + [
-                '-i', aax_file, '-an', '-vcodec', 'copy', cover_file
+                '-i', aax_file, '-an', '-vcodec', 'copy', "-y", cover_file
             ]
             result = subprocess.run(cmd, capture_output=True)
             
@@ -389,7 +392,7 @@ class AAXConverter:
         cmd.extend(['-f', self.container])
         
         # Output file
-        cmd.append(output_file)
+        cmd.extend(["-y", output_file])
 
         try:
             result = subprocess.run(cmd, capture_output=True, text=True)
@@ -438,7 +441,7 @@ class AAXConverter:
                     '-c:a', 'copy', '-c:v', 'copy',
                     '-id3v2_version', '3',
                     '-metadata:s:v', 'title=Album cover',
-                    '-metadata:s:v', 'comment=Cover (front)',
+                    '-metadata:s:v', 'comment=Cover (front)', "-y",
                     temp_file
                 ]
                 result = subprocess.run(cmd, capture_output=True)
@@ -492,9 +495,29 @@ class AAXConverter:
                     self.show_progress(chapter_num, total_chapters)
 
                 # Build ffmpeg command for chapter extraction
-                cmd = [self.ffmpeg, '-nostats', '-loglevel', 'error'] + decrypt_param + [
+                cmd = [self.ffmpeg, '-nostats', '-loglevel', 'error', "-y"] + decrypt_param + [
                     '-i', aax_file, '-ss', str(start_time), '-to', str(end_time)
                 ]
+
+                # Add cover art input if available
+                if cover_file and os.path.isfile(cover_file):
+                    cmd.extend(['-i', os.path.abspath(cover_file)])
+
+                # Add metadata
+                cmd.extend([
+                    '-metadata', f"title={chapter_title}",
+                    '-metadata', f"track={chapter_num}",
+                ])
+                if metadata.get('artist'):
+                    cmd.extend(['-metadata', f"artist={metadata['artist']}"])
+                if metadata.get('album'):
+                    cmd.extend(['-metadata', f"album={metadata['album']}"])
+
+                # Add cover art mapping instructions if available
+                if cover_file and os.path.isfile(cover_file):
+                    cmd.extend(['-map', '0:0', '-map', '1:0'])
+                # Remove chapter metadata
+                cmd.extend(['-map_chapters', '-1'])
 
                 # Add codec settings
                 if self.codec == 'copy':
@@ -508,25 +531,10 @@ class AAXConverter:
                             cmd.extend(['-compression_level', str(self.args.level)])
                         elif self.codec == 'libopus':
                             cmd.extend(['-compression_level', str(self.args.level)])
-
-                # Add metadata
-                cmd.extend([
-                    '-metadata', f"title={chapter_title}",
-                    '-metadata', f"track={chapter_num}",
-                ])
-                if metadata.get('artist'):
-                    cmd.extend(['-metadata', f"artist={metadata['artist']}"])
-                if metadata.get('album'):
-                    cmd.extend(['-metadata', f"album={metadata['album']}"])
-
-                # Add cover art if available
+                # Add cover art metadata if available
                 if cover_file and os.path.isfile(cover_file):
-                    cmd.extend(['-i', cover_file, '-map', '0:0', '-map', '1:0',
-                               '-metadata:s:v', 'title=Album cover',
-                               '-metadata:s:v', 'comment=Cover (front)'])
-
-                # Remove chapter metadata
-                cmd.extend(['-map_chapters', '-1'])
+                    cmd.extend(['-metadata:s:v', 'title=Album cover',
+                               '-metadata:s:v', 'comment=Cover (front)'])             
 
                 # Set container format
                 cmd.extend(['-f', self.container, chapter_file])
