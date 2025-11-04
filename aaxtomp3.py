@@ -94,6 +94,7 @@ class AAXConverter:
             self.logger.error("  MacOS:   brew install ffmpeg")
             self.logger.error("  Ubuntu:  sudo apt-get update; sudo apt-get install ffmpeg")
             self.logger.error("  RHEL:    yum install ffmpeg")
+            self.logger.error("  Windows: https://www.ffmpeg.org/download.html#build-windows")
             sys.exit(1)
 
         # Check for ffprobe
@@ -106,22 +107,40 @@ class AAXConverter:
             self.logger.error("Installation instructions:")
             self.logger.error("  MacOS:   brew install ffmpeg")
             self.logger.error("  Ubuntu:  sudo apt-get update; sudo apt-get install ffmpeg")
+            self.logger.error("  RHEL:    yum install ffmpeg")
+            self.logger.error("  Windows: https://www.ffmpeg.org/download.html#build-windows")
             sys.exit(1)
+
+        # Set up mp4art and mp4chaps paths
+        self.mp4art = self.args.mp4art_name
+        if self.args.mp4art_path:
+            self.mp4art = os.path.join(self.args.mp4art_path, self.args.mp4art_name)
+        
+        self.mp4chaps = self.args.mp4chaps_name
+        if self.args.mp4chaps_path:
+            self.mp4chaps = os.path.join(self.args.mp4chaps_path, self.args.mp4chaps_name)
+
+        # Set up mediainfo path
+        self.mediainfo = self.args.mediainfo_name
+        if self.args.mediainfo_path:
+            self.mediainfo = os.path.join(self.args.mediainfo_path, self.args.mediainfo_name)
 
         # Check for optional tools
         if self.container == 'mp4':
-            if not shutil.which('mp4art'):
-                self.logger.warning("WARN: mp4art was not found on your PATH")
+            if not shutil.which(self.mp4art):
+                self.logger.warning(f"WARN: {self.mp4art} was not found on your PATH")
                 self.logger.warning("  MacOS:   brew install mp4v2")
                 self.logger.warning("  Ubuntu:  sudo apt-get install mp4v2-utils")
+                self.logger.warning("  Windows:  Source available at https://github.com/enzo1982/mp4v2/releases")
             
-            if not shutil.which('mp4chaps'):
-                self.logger.warning("WARN: mp4chaps was not found on your PATH")
+            if not shutil.which(self.mp4chaps):
+                self.logger.warning(f"WARN: {self.mp4chaps} was not found on your PATH")
                 self.logger.warning("  MacOS:   brew install mp4v2")
                 self.logger.warning("  Ubuntu:  sudo apt-get install mp4v2-utils")
+                self.logger.warning("  Windows:  Source available at https://github.com/enzo1982/mp4v2/releases")
 
         # Check for mediainfo (optional)
-        self.has_mediainfo = shutil.which('mediainfo') is not None
+        self.has_mediainfo = shutil.which(self.mediainfo) is not None
 
     def validate_aax_file(self, aax_file: str, decrypt_param: List[str]) -> bool:
         """Validate an AAX/AAXC file."""
@@ -215,7 +234,7 @@ class AAXConverter:
         # Get additional metadata from mediainfo if available
         if self.has_mediainfo:
             try:
-                cmd = ['mediainfo', aax_file]
+                cmd = [self.mediainfo, aax_file]
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 output = result.stdout
                 
@@ -229,7 +248,7 @@ class AAXConverter:
                     metadata['publisher'] = publisher_match.group(1).strip()
                     
             except Exception as e:
-                self.logger.debug(f"mediainfo extraction failed: {e}")
+                self.logger.debug(f"{self.mediainfo} extraction failed: {e}")
 
         return metadata
 
@@ -415,12 +434,12 @@ class AAXConverter:
         
         if self.container == 'mp4':
             # Use mp4art for mp4 containers
-            if shutil.which('mp4art'):
+            if shutil.which(self.mp4art):
                 try:
-                    cmd = ['mp4art', '--add', cover_file, audio_file]
+                    cmd = [self.mp4art, '--add', cover_file, audio_file]
                     subprocess.run(cmd, capture_output=True, check=True)
                 except Exception as e:
-                    self.logger.debug(f"Failed to add cover art with mp4art: {e}")
+                    self.logger.debug(f"Failed to add cover art with {self.mp4art}: {e}")
         else:
             # Use ffmpeg for other containers
             # Create a secure temporary file using NamedTemporaryFile
@@ -671,7 +690,7 @@ class AAXConverter:
                 return
 
             # Add chapters to m4b file if available
-            if self.container == 'mp4' and shutil.which('mp4chaps'):
+            if self.container == 'mp4' and shutil.which(self.mp4chaps):
                 chapters = self.get_chapters(aax_file, decrypt_param)
                 if chapters:
                     # Create chapters file for mp4chaps
@@ -688,7 +707,7 @@ class AAXConverter:
                             cf.write(f"CHAPTER{chapter['num']:02d}NAME={chapter['title']}\n")
                     
                     try:
-                        subprocess.run(['mp4chaps', '-i', output_file], capture_output=True)
+                        subprocess.run([self.mp4chaps, '-i', output_file], capture_output=True)
                     except Exception as e:
                         self.logger.debug(f"Failed to add chapters: {e}")
 
@@ -796,6 +815,18 @@ def main():
                                help='Custom ffmpeg binary name')
     advanced_group.add_argument('--ffprobe-name', default='ffprobe',
                                help='Custom ffprobe binary name')
+    advanced_group.add_argument('--mp4art-path', metavar='PATH',
+                               help='Path to mp4art binary')
+    advanced_group.add_argument('--mp4art-name', default='mp4art',
+                               help='Custom mp4art binary name')
+    advanced_group.add_argument('--mp4chaps-path', metavar='PATH',
+                               help='Path to mp4chaps binary')
+    advanced_group.add_argument('--mp4chaps-name', default='mp4chaps',
+                               help='Custom mp4chaps binary name')
+    advanced_group.add_argument('--mediainfo-path', metavar='PATH',
+                               help='Path to mediainfo binary')
+    advanced_group.add_argument('--mediainfo-name', default='mediainfo',
+                               help='Custom mediainfo binary name')
     
     # Files
     parser.add_argument('files', nargs='+', metavar='FILE',
