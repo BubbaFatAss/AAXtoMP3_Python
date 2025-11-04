@@ -517,14 +517,8 @@ class AAXConverter:
                 cmd = [self.ffmpeg, '-nostats', '-loglevel', 'error', "-y"] + decrypt_param + [
                     '-i', aax_file ]
                 
-                # If cover art is to be added, include it as input
-                if cover_file and os.path.isfile(cover_file):
-                    cmd.extend(['-i', cover_file])
-
                 #declare mappings
                 cmd.extend(['-map', '0:a'])
-                if cover_file and os.path.isfile(cover_file):
-                    cmd.extend(['-map', '1:v'])
 
                 # Set start and end times
                 cmd.extend(['-ss', str(start_time), '-to', str(end_time)])
@@ -541,9 +535,6 @@ class AAXConverter:
                             cmd.extend(['-compression_level', str(self.args.level)])
                         elif self.codec == 'libopus':
                             cmd.extend(['-compression_level', str(self.args.level)])
-                #Add album art codec
-                if cover_file and os.path.isfile(cover_file):
-                    cmd.extend(['-c:v', 'copy', "-disposition:v:0", "attached_pic"])
 
                 # Remove chapter metadata
                 cmd.extend(['-map_chapters', '-1'])
@@ -558,11 +549,6 @@ class AAXConverter:
                 if metadata.get('album'):
                     cmd.extend(['-metadata', f"album={metadata['album']}"])
 
-                # Add cover art metadata if available
-                if cover_file and os.path.isfile(cover_file):
-                    cmd.extend(['-metadata:s:v', 'title=Album cover',
-                               '-metadata:s:v', 'comment=Cover (front)'])
-
                 # Set container format
                 cmd.extend(['-f', self.container, chapter_file])
 
@@ -571,6 +557,9 @@ class AAXConverter:
                     if result.returncode != 0:
                         self.logger.error(f"Failed to create chapter {chapter_num}")
                         continue
+                    # Add cover art if available
+                    if cover_file and os.path.isfile(cover_file):
+                        self.add_cover_art(chapter_file, cover_file)
                 except Exception as e:
                     self.logger.error(f"Failed to create chapter {chapter_num}: {e}")
                     continue
