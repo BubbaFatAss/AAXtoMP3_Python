@@ -43,7 +43,7 @@ class AAXConverter:
             log_format = '%(message)s'
             date_format = None
             
-        logging.basicConfig(level=level, format=log_format, datefmt=date_format)
+        logging.basicConfig(level=level, format=log_format, datefmt=date_format, stream=sys.stdout)
         self.logger = logging.getLogger(__name__)
 
     def setup_codec(self):
@@ -154,7 +154,7 @@ class AAXConverter:
 
         # Test with ffprobe
         try:
-            cmd = [self.ffprobe, '-loglevel', 'warning'] + decrypt_param + ['-i', aax_file]
+            cmd = [self.ffprobe, '-loglevel', 'warning'] + decrypt_param + ['-i', os.path.abspath(aax_file)]
             result = subprocess.run(cmd, capture_output=True, text=True)
             
             if result.returncode != 0:
@@ -171,7 +171,7 @@ class AAXConverter:
         if self.args.validate:
             try:
                 cmd = [self.ffmpeg, '-hide_banner'] + decrypt_param + [
-                    '-i', aax_file, '-vn', '-f', 'null', '-'
+                    '-i', os.path.abspath(aax_file), '-vn', '-f', 'null', '-'
                 ]
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 
@@ -193,7 +193,7 @@ class AAXConverter:
         
         # Get metadata from ffprobe
         try:
-            cmd = [self.ffprobe] + decrypt_param + ['-i', aax_file]
+            cmd = [self.ffprobe] + decrypt_param + ['-i', os.path.abspath(aax_file)]
             result = subprocess.run(cmd, capture_output=True, text=True)
             
             # Parse ffprobe output
@@ -234,7 +234,7 @@ class AAXConverter:
         # Get additional metadata from mediainfo if available
         if self.has_mediainfo:
             try:
-                cmd = [self.mediainfo, aax_file]
+                cmd = [self.mediainfo, os.path.abspath(aax_file)]
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 output = result.stdout
                 
@@ -258,7 +258,7 @@ class AAXConverter:
         
         try:
             cmd = [self.ffmpeg, '-loglevel', 'error'] + decrypt_param + [
-                '-i', aax_file, '-an', '-vcodec', 'copy', "-y", cover_file
+                '-i', os.path.abspath(aax_file), '-an', '-vcodec', 'copy', "-y", os.path.abspath(cover_file)
             ]
             result = subprocess.run(cmd, capture_output=True)
             
@@ -274,7 +274,7 @@ class AAXConverter:
         chapters = []
         
         try:
-            cmd = [self.ffprobe, '-i', aax_file, '-print_format', 'json',
+            cmd = [self.ffprobe, '-i', os.path.abspath(aax_file), '-print_format', 'json',
                    '-show_chapters', '-loglevel', 'error'] + decrypt_param
             result = subprocess.run(cmd, capture_output=True, text=True)
             
@@ -375,7 +375,7 @@ class AAXConverter:
         
         # Build ffmpeg command
         cmd = [self.ffmpeg, '-nostats', '-loglevel', 'error'] + decrypt_param + [
-            '-i', aax_file
+            '-i', os.path.abspath(aax_file)
         ]
 
         # Add codec and quality settings
@@ -436,7 +436,7 @@ class AAXConverter:
             # Use mp4art for mp4 containers
             if shutil.which(self.mp4art):
                 try:
-                    cmd = [self.mp4art, '--add', cover_file, audio_file]
+                    cmd = [self.mp4art, '--add', os.path.abspath(cover_file), os.path.abspath(audio_file)]
                     subprocess.run(cmd, capture_output=True, check=True)
                 except Exception as e:
                     self.logger.debug(f"Failed to add cover art with {self.mp4art}: {e}")
@@ -455,7 +455,7 @@ class AAXConverter:
                 
                 cmd = [
                     self.ffmpeg, '-loglevel', 'error', '-nostats',
-                    '-i', audio_file, '-i', cover_file,
+                    '-i', os.path.abspath(audio_file), '-i', os.path.abspath(cover_file),
                     '-map', '0:a:0', '-map', '1:v:0',
                     '-c:a', 'copy', '-c:v', 'copy',
                     '-id3v2_version', '3',
@@ -515,7 +515,7 @@ class AAXConverter:
 
                 # Build ffmpeg command for chapter extraction
                 cmd = [self.ffmpeg, '-nostats', '-loglevel', 'error', "-y"] + decrypt_param + [
-                    '-i', aax_file ]
+                    '-i', os.path.abspath(aax_file) ]
                 
                 #declare mappings
                 cmd.extend(['-map', '0:a'])
@@ -649,6 +649,7 @@ class AAXConverter:
         if os.path.isdir(output_dir) and self.args.no_clobber:
             self.logger.info(f"Skipping {aax_file} - output directory exists")
             return
+        self.logger.info(f"Output Directory: {os.path.abspath(output_dir)}")
 
         # Create output directory
         os.makedirs(output_dir, exist_ok=True)
@@ -696,7 +697,7 @@ class AAXConverter:
                             cf.write(f"CHAPTER{chapter['num']:02d}NAME={chapter['title']}\n")
                     
                     try:
-                        subprocess.run([self.mp4chaps, '-i', output_file], capture_output=True)
+                        subprocess.run([self.mp4chaps, '-i', os.path.abspath(output_file)], capture_output=True)
                     except Exception as e:
                         self.logger.debug(f"Failed to add chapters: {e}")
 
